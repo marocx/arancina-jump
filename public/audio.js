@@ -184,15 +184,38 @@
     }
   }
 
+  // Con la scheda in background il browser rallenta i timer (anche a 1 volta al secondo):
+  // per questo si pianifica con molto anticipo.
+  const LOOKAHEAD = 0.8;
+
   function scheduler() {
     if (!ctx || !track) return;
-    const stepDur = 60 / bpm / 4;
-    while (nextTime < ctx.currentTime + 0.15) {
-      playStep(step, nextTime);
-      nextTime += stepDur;
-      step += 1;
+    try {
+      const now = ctx.currentTime;
+      // Dopo una pausa (contesto sospeso o scheda nascosta) riparte dal presente, senza recuperare tutto insieme
+      if (nextTime < now) {
+        step += Math.floor((now - nextTime) / (60 / bpm / 4));
+        nextTime = now + 0.05;
+      }
+      const stepDur = 60 / bpm / 4;
+      while (nextTime < now + LOOKAHEAD) {
+        playStep(step, nextTime);
+        nextTime += stepDur;
+        step += 1;
+      }
+    } catch (err) {
+      // Un passo che fallisce non deve fermare la musica per sempre
+      console.warn('Audio:', err);
+      nextTime = (ctx ? ctx.currentTime : 0) + 0.05;
     }
   }
+
+  // Il contesto può essere sospeso (cambio scheda, interruzioni del sistema): lo riprendo appena possibile
+  function keepRunning() {
+    if (ctx && unlocked && ctx.state !== 'running') ctx.resume().catch(() => {});
+  }
+  document.addEventListener('visibilitychange', keepRunning);
+  window.addEventListener('focus', keepRunning);
 
   function startTrack(name) {
     if (!ctx) return;
@@ -233,11 +256,13 @@
   function unlock() {
     const c = ensure();
     if (!c) return;
-    if (c.state === 'suspended') c.resume();
+    if (c.state !== 'running') c.resume().catch(() => {});
     if (!unlocked) {
       unlocked = true;
       if (musicOn() && wantedTrack) startTrack(wantedTrack);
     }
+    // Riprende se il sistema ha sospeso l'audio, poi reimposta il sequencer dal presente
+    c.onstatechange = () => { if (c.state === 'running' && track) nextTime = c.currentTime + 0.05; };
   }
 
   function applySettings() {
