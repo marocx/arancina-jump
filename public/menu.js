@@ -83,6 +83,7 @@
       prefs[key] = !prefs[key];
       savePrefs();
       refreshSettings();
+      window.dispatchEvent(new Event('settings'));
     });
   });
 

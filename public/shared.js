@@ -87,18 +87,20 @@
     const widthRoll = rnd();
     const dxRoll = rnd();
 
-    const gap = ROW_GAP_MIN + gapRoll * (ROW_GAP_MAX - ROW_GAP_MIN);
-    const d = Math.min(1, r / 150);
+    // Difficoltà crescente con l'altezza: piena a ~1000 righe, più rapida che in origine
+    const d = Math.min(1, r / 100);
+    // Distanze verticali un po' più ampie in alto, ma sempre raggiungibili (il salto arriva a ~162 px)
+    const gap = ROW_GAP_MIN + gapRoll * (ROW_GAP_MAX + d * 8 - ROW_GAP_MIN);
 
     let kind = 'cloud';
     if (r % CHECKPOINT_EVERY === 0) kind = 'gold';
     else if (kindRoll < 0.09 + d * 0.05) kind = 'bounce';
-    else if (kindRoll < 0.18 + d * 0.08) kind = 'ice';
-    else if (kindRoll < 0.25 + d * 0.06) kind = 'wind';
-    else if (kindRoll < 0.31 + d * 0.06) kind = 'storm';
+    else if (kindRoll < 0.18 + d * 0.12) kind = 'ice';
+    else if (kindRoll < 0.25 + d * 0.07) kind = 'wind';
+    else if (kindRoll < 0.31 + d * 0.11) kind = 'storm';
     else if (kindRoll < 0.37 + d * 0.04) kind = 'mini';
 
-    let w = Math.round(clampN(200 - d * 90 + (widthRoll - 0.5) * 40, 90, 220));
+    let w = Math.round(clampN(200 - d * 115 + (widthRoll - 0.5) * 40, 80, 220));
     if (kind === 'mini') w = Math.round(70 + widthRoll * 30);
     const dx = (dxRoll * 2 - 1) * (ROW_DX - d * 40);
     const prevCx = prev.x + prev.w / 2;
@@ -224,7 +226,8 @@
     // Effetti delle nuvole speciali su cui si è appoggiati
     if (!stunned && p.onGround) {
       const under = rowUnder(p, gen);
-      if (under && under.kind === 'wind') p.vx += (under.r % 2 === 0 ? 1 : -1) * WIND_PUSH;
+      // Il vento spinge più forte man mano che si sale
+      if (under && under.kind === 'wind') p.vx += (under.r % 2 === 0 ? 1 : -1) * WIND_PUSH * (1 + 0.6 * Math.min(1, under.r / 100));
       if (under && under.kind === 'storm') p.vx *= STORM_SLOW;
     }
 

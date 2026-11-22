@@ -149,7 +149,10 @@
       if (stats.unlocked.includes(id) || !Cos.isUnlocked(id, stats)) continue;
       stats.unlocked.push(id);
       changed = true;
-      if (joined) showBanner(`SBLOCCATO: ${Cos.ITEMS[id].name}!`, 3200);
+      if (joined) {
+        showBanner(`SBLOCCATO: ${Cos.ITEMS[id].name}!`, 3200);
+        window.ClimbAudio.sfx('unlock');
+      }
     }
     return changed;
   }
@@ -587,6 +590,7 @@
     refreshPlayEnabled();
   });
 
+  window.ClimbAudio.music('menu');
   loadAccount();
 
   /* ═══ Connessione ═══ */
@@ -700,11 +704,13 @@
 
   /* Crollo periodico: avviso, poi scossa, flash e polvere */
   socket.on('resetSoon', () => {
+    window.ClimbAudio.sfx('warn');
     showBanner('ATTENZIONE: LA TORRE CROLLA TRA 5 SECONDI!', 4200);
     shake = Math.max(shake, 4);
   });
 
   socket.on('reset', (d) => {
+    window.ClimbAudio.sfx('crash');
     setResetAt(d && d.next, d && d.serverNow);
     showBanner('CROLLO! CLASSIFICA AZZERATA', 3600);
     shake = Math.max(shake, 22);
@@ -722,6 +728,7 @@
 
   socket.on('joined', (data) => {
     myId = data.id;
+    window.ClimbAudio.music('game');
     if (data.stats) Object.assign(stats, data.stats);
     gen = new S.LevelGen(data.seed);
     roster.clear();
@@ -790,6 +797,10 @@
   });
 
   socket.on('event', (ev) => {
+    const A = window.ClimbAudio;
+    if (ev.type === 'milestone') A.sfx('milestone');
+    else if (ev.type === 'record') A.sfx('record');
+    else if (ev.type === 'checkpoint') A.sfx('checkpoint');
     if (ev.type === 'milestone') {
       showBanner(`${ev.name} ha superato ${ev.meters} m!`, 2600);
     } else if (ev.type === 'record') {
@@ -804,6 +815,8 @@
   });
 
   socket.on('fx', (ev) => {
+    if (ev.type === 'hit') window.ClimbAudio.sfx('hit');
+    else if (ev.type === 'stomp') window.ClimbAudio.sfx('stomp');
     if (ev.type === 'shove') {
       if (ev.id === myId) return;               // il nostro fendente è già mostrato in locale
       spawnFx('slash', ev.x, ev.y, ev.face);
@@ -832,11 +845,13 @@
   });
 
   socket.on('chat', (m) => {
+    if (m.id !== myId) window.ClimbAudio.sfx('chat');
     appendChat(m);
     bubbles.set(m.id, { text: m.text, until: performance.now() + BUBBLE_MS });
   });
 
   socket.on('emote', (m) => {
+    window.ClimbAudio.sfx('emote');
     emotes.set(m.id, { e: m.e, t0: performance.now() });
   });
 
@@ -857,10 +872,12 @@
 
   function pressJump() {
     jumpQueued = true;
+    window.ClimbAudio.sfx('jump');
   }
 
   function pressAttack() {
     attackQueued = true;
+    window.ClimbAudio.sfx('slash');
   }
 
   function openChat() {
@@ -1101,6 +1118,7 @@
       if (fall > 220) {
         burst(x + PLAYER_W / 2, y + PLAYER_H, 'dust', Math.min(14, 4 + fall / 60));
         if (isLocal) shake = Math.max(shake, clamp(fall / 120, 2, 9));
+        if (isLocal) window.ClimbAudio.sfx('land');
       }
     }
 
@@ -1569,6 +1587,7 @@
       burst(renderX + PLAYER_W / 2, renderY + PLAYER_H, 'ice', 1);
     }
     const mySt = { stun: me.stun, inv: (remoteState.get(myId) || {}).inv || 0 };
+    if (joined) window.ClimbAudio.setTempo(Math.max(0, -renderY / PX_PER_METER));
     drawPlayer(renderX, renderY, myInfo.color, myInfo.name, true, myId, v, mySt, now, selectedSkin, selCos);
 
     drawFx(now);
